@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel de Transcrição</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #drop-zone {
+            width: 400px;
+            height: 150px;
+            border: 2px dashed #888;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+        #drop-zone.dragover { border-color: #4caf50; }
+        #resultado { display: flex; gap: 20px; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; max-height: 400px; }
+        .col { flex: 1; }
+        #progress { width: 100%; height: 20px; background: #ddd; border-radius: 10px; overflow: hidden; margin-bottom: 10px; display: none; }
+        #progress-bar { height: 100%; width: 0%; background: #4caf50; transition: width 0.3s; }
+    </style>
+</head>
+<body>
+    <h1>Painel de Transcrição</h1>
+
+    <div id="drop-zone">Arraste o arquivo aqui (.mp3 ou .wav)</div>
+
+    <div id="progress">
+        <div id="progress-bar"></div>
+    </div>
+
+    <div id="resultado">
+        <div class="col">
+            <h2>Transcrição:</h2>
+            <pre id="transcricao"></pre>
+        </div>
+        <div class="col">
+            <h2>Relatório:</h2>
+            <pre id="relatorio"></pre>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const transcricaoEl = document.getElementById('transcricao');
+        const relatorioEl = document.getElementById('relatorio');
+        const progress = document.getElementById('progress');
+        const progressBar = document.getElementById('progress-bar');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+
+            const file = e.dataTransfer.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('audio_file', file);
+
+            transcricaoEl.textContent = '';
+            relatorioEl.textContent = '';
+            progress.style.display = 'block';
+            progressBar.style.width = '0%';
+
+            fetch('/upload', { method: 'POST', body: formData })
+            .then(response => response.json())
+            .then(data => {
+                // Simula progresso rápido
+                let width = 0;
+                const interval = setInterval(() => {
+                    if (width >= 100) clearInterval(interval);
+                    width += 10;
+                    progressBar.style.width = width + '%';
+                }, 50);
+
+                // Exibe resultado
+                relatorioEl.textContent = data.relatorio || 'Erro ao gerar relatório';
+            })
+            .catch(err => {
+                relatorioEl.textContent = `Erro: ${err}`;
+            });
+        });
+    </script>
+</body>
+</html>
