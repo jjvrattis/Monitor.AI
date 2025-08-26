@@ -39,6 +39,9 @@ def get_transcription_result(transcript_id):
         elif status == 'error':
             return {"error": resp.get('error')}
         time.sleep(3)
+        waited += 3
+    return {"error": "Timeout na transcrição"}
+
 
 # --- FUNÇÕES DE PROCESSAMENTO ---
 def merge_short_segments(utterances, min_words=3):
