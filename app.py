@@ -30,10 +30,12 @@ def start_transcription(audio_url):
     response = requests.post(TRANSCRIPT_ENDPOINT, json=data, headers=headers)
     return response.json()['id']
 
-def get_transcription_result(transcript_id):
+def get_transcription_result(transcript_id, max_wait=60):
     headers = {'authorization': ASSEMBLY_API_KEY}
     polling_url = f"{TRANSCRIPT_ENDPOINT}/{transcript_id}"
-    while True:
+    waited = 0  # ← Inicializa a variável aqui
+
+    while waited < max_wait:
         resp = requests.get(polling_url, headers=headers).json()
         status = resp.get('status')
         if status == 'completed':
@@ -41,6 +43,10 @@ def get_transcription_result(transcript_id):
         elif status == 'error':
             return {"error": resp.get('error')}
         time.sleep(3)
+        waited += 3
+
+    return {"error": "Timeout na transcrição"}
+
 
 # --- FUNÇÕES DE PROCESSAMENTO ---
 def merge_short_segments(utterances, min_words=3):

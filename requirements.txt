@@ -11,5 +11,8 @@ click==8.1.6
 blinker==1.6.2
 colorama==0.4.6
 openai
+flask
 requests
+openai
 assemblyai
+gunicorn
