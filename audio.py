@@ -1,11 +1,13 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import os
 import requests
 import time
 from openai import OpenAI
 
 # --- CONFIGURAÇÕES FLASK ---
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__)
+CORS(app, origins=["http://localhost:3000"], methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"]) 
 
 # --- CHAVES E ENDPOINTS ---
 ASSEMBLY_API_KEY = "684a9d6c573d4e4f9fd2714ceb686c08"
@@ -104,42 +106,85 @@ Transcrição:
 # --- ROTAS FLASK ---
 @app.route("/")
 def index():
-    return render_template("painel.html")
+    return jsonify({
+        "app": "Monitor.AI Audio Service",
+        "version": "1.0",
+        "status": "running",
+        "endpoints": {
+            "upload": "/upload",
+            "health": "/"
+        }
+    })
 
 @app.route("/upload", methods=["POST"])
-def upload():
+def upload_file():
+    print(f"Request method: {request.method}")
+    print(f"Request files: {request.files}")
+    print(f"Request form: {request.form}")
+    
     file = request.files.get("audio_file")
     if not file:
+        print("Erro: Nenhum arquivo de áudio enviado")
         return jsonify({"success": False, "relatorio": "Nenhum arquivo de áudio enviado"}), 400
 
+    print(f"Arquivo recebido: {file.filename}")
     os.makedirs("uploads", exist_ok=True)
     file_path = os.path.join("uploads", file.filename)
     file.save(file_path)
+    print(f"Arquivo salvo em: {file_path}")
 
     try:
+        print("Iniciando upload para Assembly AI...")
         audio_url = upload_audio(file_path)
+        print(f"Upload concluído. URL do áudio: {audio_url}")
+        
+        print("Iniciando transcrição...")
         transcript_id = start_transcription(audio_url)
+        print(f"Transcrição iniciada. ID: {transcript_id}")
+        
+        print("Aguardando resultado da transcrição...")
         result = get_transcription_result(transcript_id)
+        print(f"Resultado da transcrição recebido: {type(result)}")
 
         if "error" in result:
+            print(f"Erro na transcrição: {result['error']}")
             return jsonify({"success": False, "relatorio": f"Erro na transcrição: {result['error']}"})
         else:
+            print("Processando utterances...")
             utterances = result.get('utterances', [])
             utterances = merge_short_segments(utterances)
             utterances = identificar_operador_cliente(utterances)
             full_text = "\n".join([f"{utt['speaker']}: {utt['text']}" for utt in utterances])
+            print(f"Texto completo gerado: {len(full_text)} caracteres")
             
+            print("Gerando relatório com OpenAI...")
             # --- gera relatório usando OpenAI ---
             relatorio = gerar_relatorio_openai(full_text)
+            print(f"Relatório gerado: {len(relatorio)} caracteres")
             
-            return jsonify({"success": True, "relatorio": relatorio, "descricao": "Relatório gerado com sucesso!"})
+            response_data = {
+                "success": True, 
+                "transcription": full_text,
+                "analysis": relatorio,
+                "segments": utterances,
+                "duration": result.get('audio_duration', 0),
+                "speakers": list(set([utt['speaker'] for utt in utterances])),
+                "relatorio": relatorio, 
+                "descricao": "Relatório gerado com sucesso!"
+            }
+            print("Enviando resposta para o frontend...")
+            return jsonify(response_data)
 
     except Exception as e:
+        print(f"ERRO no processamento: {str(e)}")
+        print(f"Tipo do erro: {type(e)}")
+        import traceback
+        print(f"Stack trace: {traceback.format_exc()}")
         return jsonify({"success": False, "relatorio": f"Erro no processamento: {str(e)}"})
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
 
